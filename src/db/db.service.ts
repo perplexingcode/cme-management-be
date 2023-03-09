@@ -3,13 +3,14 @@ import {
   DynamoDBClient,
   GetItemCommand,
   PutItemCommand,
+  DeleteItemCommand,
   ScanCommand,
 } from '@aws-sdk/client-dynamodb';
 import { TaskDTO } from 'src/dtos/task.dto';
 import { v4 } from 'uuid';
 import * as fs from 'fs';
 import * as moment from 'moment';
-
+const { marshall, unmarshall } = require('@aws-sdk/util-dynamodb');
 @Injectable()
 export class DbService {
   TABLE_NAME = {
@@ -21,6 +22,7 @@ export class DbService {
     try {
       const data = await request;
       return data;
+      // return unmarshall(data.Item);
     } catch (error) {
       console.log(error);
     }
@@ -29,8 +31,8 @@ export class DbService {
     return new DynamoDBClient({
       region: this.REGION,
       credentials: {
-        accessKeyId: 'AKIAZO67ZV6JVDCT2BVJ',
-        secretAccessKey: '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',
+        accessKeyId: process.env.AWS_KEY,
+        secretAccessKey: process.env.AWS_SECRET,
       },
     });
   }
@@ -43,10 +45,12 @@ export class DbService {
     const batch1Data = await this.asyWrap(
       this.DDB.send(new ScanCommand(params)),
     );
+
     items = items.concat(batch1Data.Items);
     if (!batch1Data.LastEvaluatedKey) {
       lastPage = true;
-      return batch1Data;
+      const data = batch1Data.Items.map((item) => unmarshall(item));
+      return data;
     }
     batchId = batch1Data.LastEvaluatedKey;
     while (!lastPage) {
@@ -58,14 +62,15 @@ export class DbService {
       if (!batchData.LastEvaluatedKey) lastPage = true;
       params.LastEvaluatedKey = batchData.LastEvaluatedKey;
     }
-    return items;
+    const data = items.map((item) => unmarshall(item));
+    return data;
   }
 
-  async getTaskById(taskId, projection?): Promise<any> {
+  async getItemById(table, itemId, projection?): Promise<any> {
     const params = {
-      TableName: this.TABLE_NAME.tasks,
+      TableName: table,
       Key: {
-        id: { S: taskId },
+        id: { S: itemId },
       },
       ProjectionExpression: projection,
     };
@@ -73,9 +78,9 @@ export class DbService {
     return data;
   }
 
-  async getTaskByQuery(key, value, projection?): Promise<any> {
+  async getItemByQuery(table, key, value, projection?): Promise<any> {
     const params = {
-      TableName: this.TABLE_NAME.tasks,
+      TableName: table,
       Key: {
         [key]: { S: value },
       },
@@ -85,14 +90,18 @@ export class DbService {
     return data;
   }
 
-  async getAllTasks(projection?): Promise<any> {
+  async getAllItems(table, projection?): Promise<any> {
     const params = {
-      TableName: this.TABLE_NAME.tasks,
-      ProjectionExpression: projection,
+      TableName: table,
+      // ProjectionExpression: projection || '',
     };
     return await this.baseScan(params);
   }
-  async scanItemsSimple(filterFormula, ProjectionExpression?): Promise<any> {
+  async scanItemsSimple(
+    table,
+    filterFormula,
+    ProjectionExpression?,
+  ): Promise<any> {
     const urlParams = new URLSearchParams(filterFormula);
     const paramsObj = Object.fromEntries(urlParams);
     let FilterExpression = '';
@@ -108,23 +117,41 @@ export class DbService {
 
     const params = {
       FilterExpression,
-
       ExpressionAttributeValues,
       ProjectionExpression,
-      TableName: this.TABLE_NAME.tasks,
+      TableName: table,
     };
 
     return await this.baseScan(params);
   }
-  updateTask = async function (taskParams) {
+
+  async scanItems(params) {
+    const data = await this.asyWrap(this.baseScan(params));
+    return data;
+  }
+
+  async putItem(table, itemParams) {
     const params = {
-      TableName: 'TABLE_NAME',
-      Item: taskParams,
+      TableName: table,
+      Item: marshall(itemParams),
       // Item: {
       //   CUSTOMER_ID: { N: '001' },
       //   CUSTOMER_NAME: { S: 'Richard Roe' },
       // },
     };
+    console.log('chat', marshall(itemParams));
     const data = await this.asyWrap(this.DDB.send(new PutItemCommand(params)));
-  };
+  }
+
+  async deleteItem(table, itemId) {
+    const params = {
+      TableName: table,
+      Key: {
+        id: { S: itemId },
+      },
+    };
+    const data = await this.asyWrap(
+      this.DDB.send(new DeleteItemCommand(params)),
+    );
+  }
 }
