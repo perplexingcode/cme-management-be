@@ -48,7 +48,7 @@ export class ProjectService {
     return data;
   }
   async updateProject(params) {
-    const data = await this.dbSvc.updateItem(this.DB_TABLES.project, params);
+    const data = await this.dbSvc.putItem(this.DB_TABLES.project, params);
     console.log(data);
     return data;
   }

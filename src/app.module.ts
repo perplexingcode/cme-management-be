@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { TaskModule } from './task/task.module';
+import { MoveModule } from './move/move.module';
 import { DbModule } from './db/db.module';
 import configuration from './config/configuration';
 import { ConfigModule } from '@nestjs/config';
@@ -11,7 +11,7 @@ import { ProjectModule } from './project/project.module';
     ConfigModule.forRoot({
       load: [configuration],
     }),
-    TaskModule,
+    MoveModule,
     ProjectModule,
     DbModule,
   ],
