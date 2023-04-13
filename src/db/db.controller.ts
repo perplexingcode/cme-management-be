@@ -1,32 +1,52 @@
-import { Controller, Get, Post, Param, Query, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Query,
+  Body,
+  Headers,
+} from '@nestjs/common';
 import { DbService } from './db.service';
 @Controller('db')
 export class DbController {
   constructor(private db: DbService) {}
-  @Get(':table/:id/:projection?')
+  @Get('queryId/:table/:id/:projection?')
   async getItemById(@Param('id') id, @Param('projection') projection?) {
     const data = await this.db.getItemById(id, projection);
     console.log('item-route', data);
     return data;
   }
-  @Get(':table/query')
+  @Get('query')
   async getItemByQuery(
-    @Param('table') table,
+    @Headers() headers,
     @Query('key') key,
     @Query('value') value,
     @Query('projection') projection,
   ) {
-    const data = await this.db.getItemByQuery(table, key, value, projection);
-    console.log(data.Item);
-    return data.Item;
-  }
-  @Get(':table/all/:projection?')
-  async getAllItems(@Param('table') table, @Param('projection') projection?) {
-    const data = await this.db.getAllItems(table, projection);
-    console.log('ban la nhat', new Date());
+    const data = await this.db.getItemByQuery(
+      headers.table,
+      key,
+      value,
+      projection,
+    );
+    console.log(
+      new Date(),
+      'Querying items from table: ' + headers.table + '\n',
+      key + '=' + value + '\n',
+      data,
+    );
+    console.log(data);
     return data;
   }
-  @Get(':table/filter/:filterFormula/:projection?')
+  @Get('all/:projection?')
+  async getAllItems(@Headers() headers, @Param('projection') projection?) {
+    const data = await this.db.getAllItems(headers.table, projection);
+    console.log(new Date(), 'Getting all items from table: ' + headers.table);
+    console.log(data);
+    return data;
+  }
+  @Get('filter/:table/:filterFormula/:projection?')
   async getItems(
     @Param('table') table,
     @Param('filterFormula') filterFormula,
@@ -41,15 +61,20 @@ export class DbController {
     return data;
   }
 
-  @Post(':table/upsert')
+  @Post('upsert/:table')
   async upsertItem(@Param('table') table, @Body() params: any) {
+    console.log(new Date(), 'Upserting item to table: ' + table + '\n', params);
     const data = await this.db.putItem(table, params);
     return data;
   }
 
-  @Post(':table/delete')
+  @Post('/delete/:table')
   async deleteItem(@Param('table') table, @Body() idArray: any) {
-    console.log(idArray);
+    console.log(
+      new Date(),
+      'Deleting item from table: ' + table + '\n',
+      idArray,
+    );
     for (let i = 0; i < idArray.length; i++) {
       this.db.deleteItem(table, idArray[i]);
     }

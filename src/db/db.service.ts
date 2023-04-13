@@ -5,6 +5,7 @@ import {
   PutItemCommand,
   DeleteItemCommand,
   ScanCommand,
+  QueryCommand,
 } from '@aws-sdk/client-dynamodb';
 import { TaskDTO } from 'src/dtos/task.dto';
 import { v4 } from 'uuid';
@@ -14,7 +15,7 @@ const { marshall, unmarshall } = require('@aws-sdk/util-dynamodb');
 @Injectable()
 export class DbService {
   TABLE_NAME = {
-    tasks: 'management_tasks',
+    tasks: 'management_move',
   };
   REGION = 'ap-southeast-1';
   DDB = this.getDDB();
@@ -80,13 +81,18 @@ export class DbService {
   async getItemByQuery(table, key, value, projection?): Promise<any> {
     const params = {
       TableName: table,
-      Key: {
-        [key]: { S: value },
+      IndexName: key + '-index',
+      KeyConditionExpression: '#key = :pk',
+      ExpressionAttributeValues: {
+        ':pk': { S: value },
+      },
+      ExpressionAttributeNames: {
+        '#key': key,
       },
       ProjectionExpression: projection,
     };
-    const data = await this.asyWrap(this.DDB.send(new GetItemCommand(params)));
-    return data;
+    const data = await this.asyWrap(this.DDB.send(new QueryCommand(params)));
+    return data.Items.map((item) => unmarshall(item));
   }
 
   async getAllItems(table, projection?): Promise<any> {
